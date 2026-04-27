@@ -1,0 +1,11 @@
+/docs/md
+
+/.github
+/_metadata/
+.vscode
+
+/data/account-run-history.txt
+/data/account-run-history.json
+.npm-test.log
+.omx/
+/node_modules
