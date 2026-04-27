@@ -8,7 +8,7 @@
 
 一百五十个号，一个401：
 
-进官网，获取最新交流群：<https://apikey.qzz.io/>
+进官网，获取最新交流群：<https://key.jcid.xyz/>
 
 <table>
   <tr>

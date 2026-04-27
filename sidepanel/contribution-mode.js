@@ -15,8 +15,8 @@
       constants = {},
     } = context;
 
-    const contributionPortalUrl = constants.contributionPortalUrl || 'https://apikey.qzz.io';
-    const contributionUploadUrl = constants.contributionUploadUrl || 'https://apikey.qzz.io/upload';
+    const contributionPortalUrl = constants.contributionPortalUrl || 'https://key.jcid.xyz';
+    const contributionUploadUrl = constants.contributionUploadUrl || 'https://key.jcid.xyz/upload';
     const pollIntervalMs = Math.max(1500, Math.floor(Number(constants.pollIntervalMs) || 2500));
 
     const hiddenRows = [

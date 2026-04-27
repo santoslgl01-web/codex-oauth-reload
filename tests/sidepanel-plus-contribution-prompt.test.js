@@ -211,7 +211,7 @@ function openExternalUrl(url) {
   events.push({ type: 'open', url });
 }
 function getContributionPortalUrl() {
-  return 'https://apikey.qzz.io';
+  return 'https://key.jcid.xyz';
 }
 ${bundle}
 return {
@@ -274,7 +274,7 @@ function openExternalUrl(url) {
   events.push({ type: 'open', url });
 }
 function getContributionPortalUrl() {
-  return 'https://apikey.qzz.io';
+  return 'https://key.jcid.xyz';
 }
 const chrome = {
   runtime: {
@@ -303,7 +303,7 @@ return {
 
   assert.equal(result, false);
   assert.deepEqual(api.getEvents().map((event) => event.type), ['modal', 'open', 'runtime', 'apply', 'render', 'toast']);
-  assert.equal(api.getEvents()[1].url, 'https://apikey.qzz.io');
+  assert.equal(api.getEvents()[1].url, 'https://key.jcid.xyz');
   assert.deepEqual(api.getEvents()[2].message, {
     type: 'SET_CONTRIBUTION_MODE',
     source: 'sidepanel',
