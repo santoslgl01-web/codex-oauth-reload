@@ -376,6 +376,31 @@
           </div>
         </div>
       </div>
+      <div class="data-row" id="row-clash-bridge">
+        <span class="data-label">Clash 桥接</span>
+        <div class="data-inline setting-pair">
+          <div class="setting-group setting-group-primary">
+            <label class="toggle-switch" for="input-clash-bridge-enabled" title="每轮结束后通过本地 Clash API 切换一次节点">
+              <input type="checkbox" id="input-clash-bridge-enabled" />
+              <span class="toggle-switch-track" aria-hidden="true">
+                <span class="toggle-switch-thumb"></span>
+              </span>
+            </label>
+          </div>
+          <div class="setting-group setting-group-secondary">
+            <span class="setting-caption">控制器</span>
+            <input type="text" id="input-clash-bridge-controller-url" class="data-input mono"
+              placeholder="http://127.0.0.1:9090" />
+          </div>
+        </div>
+      </div>
+      <div class="data-row" id="row-clash-bridge-proxy-group">
+        <span class="data-label">Clash 分组</span>
+        <div class="data-inline">
+          <input type="text" id="input-clash-bridge-proxy-group" class="data-input" placeholder="节点选择" />
+          <input type="password" id="input-clash-bridge-secret" class="data-input" placeholder="Secret 可留空" />
+        </div>
+      </div>
       <div class="data-row" id="row-phone-verification-enabled">
         <span class="data-label">接码</span>
         <div class="data-inline setting-pair">

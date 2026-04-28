@@ -11,6 +11,7 @@ importScripts(
   'background/generated-email-helpers.js',
   'background/signup-flow-helpers.js',
   'background/runtime-update.js',
+  'background/clash-bridge.js',
   'background/message-router.js',
   'background/verification-flow.js',
   'background/auto-run-controller.js',
@@ -241,6 +242,9 @@ const HOTMAIL_SERVICE_MODE_LOCAL = 'local';
 const DEFAULT_HOTMAIL_REMOTE_BASE_URL = '';
 const DEFAULT_HOTMAIL_LOCAL_BASE_URL = 'http://127.0.0.1:17373';
 const DEFAULT_ACCOUNT_RUN_HISTORY_HELPER_BASE_URL = DEFAULT_HOTMAIL_LOCAL_BASE_URL;
+const DEFAULT_CLASH_BRIDGE_CONTROLLER_URL = self.MultiPageBackgroundClashBridge?.DEFAULT_CONTROLLER_URL || 'http://127.0.0.1:9090';
+const DEFAULT_CLASH_BRIDGE_PROXY_GROUP = self.MultiPageBackgroundClashBridge?.DEFAULT_PROXY_GROUP || '节点选择';
+const DEFAULT_CLASH_BRIDGE_EXCLUDE_PATTERN = self.MultiPageBackgroundClashBridge?.DEFAULT_EXCLUDE_PATTERN || '香港|hong[ -]?kong|\\bhk\\b|\\bhkg\\b|🇭🇰|DIRECT|REJECT|GLOBAL|自动|故障|负载|轮询|剩余流量|套餐|到期|traffic|expire|subscription|reset';
 const HOTMAIL_LOCAL_HELPER_TIMEOUT_MS = 45000;
 const DEFAULT_LUCKMAIL_PROJECT_CODE = 'openai';
 const DEFAULT_HERO_SMS_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php';
@@ -393,6 +397,12 @@ const PERSISTED_SETTING_DEFAULTS = {
   autoRunDelayEnabled: false,
   autoRunDelayMinutes: 30,
   autoStepDelaySeconds: null,
+  clashBridgeEnabled: false,
+  clashBridgeControllerUrl: DEFAULT_CLASH_BRIDGE_CONTROLLER_URL,
+  clashBridgeSecret: '',
+  clashBridgeProxyGroup: DEFAULT_CLASH_BRIDGE_PROXY_GROUP,
+  clashBridgeExcludePattern: DEFAULT_CLASH_BRIDGE_EXCLUDE_PATTERN,
+  clashBridgeSetRuleMode: true,
   phoneVerificationEnabled: false,
   verificationResendCount: DEFAULT_VERIFICATION_RESEND_COUNT,
   mailProvider: '163',
@@ -1039,6 +1049,40 @@ function normalizeAccountRunHistoryHelperBaseUrl(rawValue = '') {
   }
 }
 
+function normalizeClashBridgeControllerUrl(value = '') {
+  if (self.MultiPageBackgroundClashBridge?.normalizeControllerUrl) {
+    return self.MultiPageBackgroundClashBridge.normalizeControllerUrl(value);
+  }
+  const raw = String(value || '').trim() || DEFAULT_CLASH_BRIDGE_CONTROLLER_URL;
+  const candidate = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(raw) ? raw : `http://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return DEFAULT_CLASH_BRIDGE_CONTROLLER_URL;
+    }
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return DEFAULT_CLASH_BRIDGE_CONTROLLER_URL;
+  }
+}
+
+function normalizeClashBridgeProxyGroup(value = '') {
+  if (self.MultiPageBackgroundClashBridge?.normalizeProxyGroup) {
+    return self.MultiPageBackgroundClashBridge.normalizeProxyGroup(value);
+  }
+  return String(value || '').trim() || DEFAULT_CLASH_BRIDGE_PROXY_GROUP;
+}
+
+function normalizeClashBridgeExcludePattern(value = '') {
+  if (self.MultiPageBackgroundClashBridge?.normalizeExcludePattern) {
+    return self.MultiPageBackgroundClashBridge.normalizeExcludePattern(value);
+  }
+  return String(value || '').trim() || DEFAULT_CLASH_BRIDGE_EXCLUDE_PATTERN;
+}
+
 function getHotmailServiceSettings(state = {}) {
   return {
     mode: normalizeHotmailServiceMode(state.hotmailServiceMode),
@@ -1116,6 +1160,8 @@ function normalizePersistentSettingValue(key, value) {
     case 'autoRunSkipFailures':
     case 'autoRunDelayEnabled':
     case 'phoneVerificationEnabled':
+    case 'clashBridgeEnabled':
+    case 'clashBridgeSetRuleMode':
     case 'plusModeEnabled':
       return Boolean(value);
     case 'autoRunFallbackThreadIntervalMinutes':
@@ -1124,6 +1170,14 @@ function normalizePersistentSettingValue(key, value) {
       return normalizeAutoRunDelayMinutes(value);
     case 'autoStepDelaySeconds':
       return normalizeAutoStepDelaySeconds(value, PERSISTED_SETTING_DEFAULTS.autoStepDelaySeconds);
+    case 'clashBridgeControllerUrl':
+      return normalizeClashBridgeControllerUrl(value);
+    case 'clashBridgeSecret':
+      return String(value || '');
+    case 'clashBridgeProxyGroup':
+      return normalizeClashBridgeProxyGroup(value);
+    case 'clashBridgeExcludePattern':
+      return normalizeClashBridgeExcludePattern(value);
     case 'verificationResendCount':
       return normalizeVerificationResendCount(value, DEFAULT_VERIFICATION_RESEND_COUNT);
     case 'mailProvider':
@@ -7296,6 +7350,16 @@ async function deleteAndBroadcastAccountRunHistoryRecords(recordIds = [], stateO
   return result;
 }
 
+const clashBridgeManager = self.MultiPageBackgroundClashBridge?.createClashBridge?.({
+  addLog,
+  getState,
+  setState,
+  fetch,
+  AbortController,
+  setTimeout,
+  clearTimeout,
+});
+
 const autoRunController = self.MultiPageBackgroundAutoRunController?.createAutoRunController({
   addLog,
   appendAccountRunRecord: (...args) => appendAndBroadcastAccountRunRecord(...args),
@@ -7324,6 +7388,7 @@ const autoRunController = self.MultiPageBackgroundAutoRunController?.createAutoR
   normalizeAutoRunFallbackThreadIntervalMinutes,
   persistAutoRunTimerPlan,
   resetState,
+  rotateClashProxyAfterRound: (...args) => clashBridgeManager?.rotateAfterRound?.(...args),
   runAutoSequenceFromStep: (...args) => runAutoSequenceFromStep(...args),
   runtime: {
     get: () => ({

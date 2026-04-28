@@ -94,6 +94,17 @@
 - 更新前建议先停止正在运行的自动流程，并导出配置。
 - 自托管 GitHub 更新清单与 CRX 发布方式见 [docs/热更新与GitHub发布说明.md](docs/热更新与GitHub发布说明.md)。
 
+## Ultra1.5 更新补充：本地 Clash 桥接
+
+侧边栏新增 `Clash 桥接` 设置，用于连接本机 Clash / Mihomo 外部控制器，并在每轮自动运行结束后自动切换到下一个可用节点。
+
+- 默认控制器：`http://127.0.0.1:9090`
+- 默认分组：`节点选择`
+- 如 Clash 配置了 `secret`，在侧边栏填写同一个 Secret。
+- 插件会尽量把 Clash 切到 `rule` 规则模式，并通过 `/proxies/{分组}` 读取和切换节点。
+- 默认会跳过香港节点、`DIRECT` / `REJECT` / `GLOBAL` 以及流量、套餐、轮询等元分组名称。
+- 浏览器流量仍需要由 Clash 自身接管：请在 Clash Verge / Mihomo 中开启系统代理或 TUN，并确认 `chatgpt.com`、`auth.openai.com`、`accounts.openai.com` 等规则会走代理节点。
+
 ## 2026-04-17 更新补充：Gmail / 2925 别名邮箱
 
 本次版本对 `Gmail` 与 `2925 provide` 的注册邮箱逻辑做了统一整理：

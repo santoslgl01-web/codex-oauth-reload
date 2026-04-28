@@ -232,6 +232,12 @@ const inputAutoSkipFailuresThreadIntervalMinutes = document.getElementById('inpu
 const inputAutoDelayEnabled = document.getElementById('input-auto-delay-enabled');
 const inputAutoDelayMinutes = document.getElementById('input-auto-delay-minutes');
 const inputAutoStepDelaySeconds = document.getElementById('input-auto-step-delay-seconds');
+const rowClashBridge = document.getElementById('row-clash-bridge');
+const rowClashBridgeProxyGroup = document.getElementById('row-clash-bridge-proxy-group');
+const inputClashBridgeEnabled = document.getElementById('input-clash-bridge-enabled');
+const inputClashBridgeControllerUrl = document.getElementById('input-clash-bridge-controller-url');
+const inputClashBridgeProxyGroup = document.getElementById('input-clash-bridge-proxy-group');
+const inputClashBridgeSecret = document.getElementById('input-clash-bridge-secret');
 const inputVerificationResendCount = document.getElementById('input-verification-resend-count');
 const rowPhoneVerificationEnabled = document.getElementById('row-phone-verification-enabled');
 const inputPhoneVerificationEnabled = document.getElementById('input-phone-verification-enabled');
@@ -1522,6 +1528,27 @@ function normalizeAutoStepDelaySeconds(value) {
   return Math.min(AUTO_STEP_DELAY_MAX_SECONDS, Math.max(AUTO_STEP_DELAY_MIN_SECONDS, Math.floor(numeric)));
 }
 
+function normalizeClashBridgeControllerUrlValue(value = '') {
+  const raw = String(value || '').trim() || 'http://127.0.0.1:9090';
+  const candidate = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(raw) ? raw : `http://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return 'http://127.0.0.1:9090';
+    }
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return 'http://127.0.0.1:9090';
+  }
+}
+
+function normalizeClashBridgeProxyGroupValue(value = '') {
+  return String(value || '').trim() || '节点选择';
+}
+
 function normalizeVerificationResendCount(value, fallback) {
   const rawValue = String(value ?? '').trim();
   if (!rawValue) {
@@ -1629,6 +1656,28 @@ function updateAutoDelayInputState() {
   const scheduled = isAutoRunScheduledPhase();
   inputAutoDelayEnabled.disabled = scheduled;
   inputAutoDelayMinutes.disabled = scheduled || !inputAutoDelayEnabled.checked;
+}
+
+function updateClashBridgeInputState() {
+  const scheduled = isAutoRunScheduledPhase();
+  const enabled = typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled
+    ? Boolean(inputClashBridgeEnabled.checked)
+    : false;
+  if (typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled) {
+    inputClashBridgeEnabled.disabled = scheduled;
+  }
+  [
+    typeof inputClashBridgeControllerUrl !== 'undefined' ? inputClashBridgeControllerUrl : null,
+    typeof inputClashBridgeProxyGroup !== 'undefined' ? inputClashBridgeProxyGroup : null,
+    typeof inputClashBridgeSecret !== 'undefined' ? inputClashBridgeSecret : null,
+  ].forEach((input) => {
+    if (input) {
+      input.disabled = scheduled || !enabled;
+    }
+  });
+  if (typeof rowClashBridgeProxyGroup !== 'undefined' && rowClashBridgeProxyGroup) {
+    rowClashBridgeProxyGroup.classList.toggle('is-disabled', !enabled);
+  }
 }
 
 function formatCountdown(remainingMs) {
@@ -1941,6 +1990,12 @@ function collectSettingsPayload() {
       id: typeof DEFAULT_HERO_SMS_COUNTRY_ID !== 'undefined' ? DEFAULT_HERO_SMS_COUNTRY_ID : 52,
       label: typeof DEFAULT_HERO_SMS_COUNTRY_LABEL !== 'undefined' ? DEFAULT_HERO_SMS_COUNTRY_LABEL : 'Thailand',
     };
+  const normalizeClashController = typeof normalizeClashBridgeControllerUrlValue === 'function'
+    ? normalizeClashBridgeControllerUrlValue
+    : ((value = '') => String(value || '').trim() || 'http://127.0.0.1:9090');
+  const normalizeClashGroup = typeof normalizeClashBridgeProxyGroupValue === 'function'
+    ? normalizeClashBridgeProxyGroupValue
+    : ((value = '') => String(value || '').trim() || '节点选择');
   return {
     ...(contributionModeEnabled ? {} : {
       panelMode: selectPanelMode.value,
@@ -2013,6 +2068,18 @@ function collectSettingsPayload() {
     autoRunDelayEnabled: inputAutoDelayEnabled.checked,
     autoRunDelayMinutes: normalizeAutoDelayMinutes(inputAutoDelayMinutes.value),
     autoStepDelaySeconds: normalizeAutoStepDelaySeconds(inputAutoStepDelaySeconds.value),
+    clashBridgeEnabled: typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled
+      ? Boolean(inputClashBridgeEnabled.checked)
+      : Boolean(latestState?.clashBridgeEnabled),
+    clashBridgeControllerUrl: typeof inputClashBridgeControllerUrl !== 'undefined' && inputClashBridgeControllerUrl
+      ? normalizeClashController(inputClashBridgeControllerUrl.value)
+      : normalizeClashController(latestState?.clashBridgeControllerUrl),
+    clashBridgeSecret: typeof inputClashBridgeSecret !== 'undefined' && inputClashBridgeSecret
+      ? (inputClashBridgeSecret.value || '')
+      : String(latestState?.clashBridgeSecret || ''),
+    clashBridgeProxyGroup: typeof inputClashBridgeProxyGroup !== 'undefined' && inputClashBridgeProxyGroup
+      ? normalizeClashGroup(inputClashBridgeProxyGroup.value)
+      : normalizeClashGroup(latestState?.clashBridgeProxyGroup),
     phoneVerificationEnabled: Boolean(inputPhoneVerificationEnabled?.checked),
     verificationResendCount: normalizeVerificationResendCount(
       inputVerificationResendCount?.value,
@@ -2345,6 +2412,7 @@ function applyAutoRunStatus(payload = currentAutoRun) {
     || usesCustomEmailPoolGenerator();
   inputEmail.disabled = locked;
   inputAutoSkipFailures.disabled = scheduled;
+  updateClashBridgeInputState();
 
   if (currentAutoRun.totalRuns > 0) {
     inputRunCount.value = String(currentAutoRun.totalRuns);
@@ -2572,6 +2640,18 @@ function applySettingsState(state) {
   inputAutoDelayEnabled.checked = Boolean(state?.autoRunDelayEnabled);
   inputAutoDelayMinutes.value = String(normalizeAutoDelayMinutes(state?.autoRunDelayMinutes));
   inputAutoStepDelaySeconds.value = formatAutoStepDelayInputValue(state?.autoStepDelaySeconds);
+  if (typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled) {
+    inputClashBridgeEnabled.checked = Boolean(state?.clashBridgeEnabled);
+  }
+  if (typeof inputClashBridgeControllerUrl !== 'undefined' && inputClashBridgeControllerUrl) {
+    inputClashBridgeControllerUrl.value = normalizeClashBridgeControllerUrlValue(state?.clashBridgeControllerUrl);
+  }
+  if (typeof inputClashBridgeProxyGroup !== 'undefined' && inputClashBridgeProxyGroup) {
+    inputClashBridgeProxyGroup.value = normalizeClashBridgeProxyGroupValue(state?.clashBridgeProxyGroup);
+  }
+  if (typeof inputClashBridgeSecret !== 'undefined' && inputClashBridgeSecret) {
+    inputClashBridgeSecret.value = state?.clashBridgeSecret || '';
+  }
   if (inputVerificationResendCount) {
     const restoredVerificationResendCount = state?.verificationResendCount !== undefined
       ? state.verificationResendCount
@@ -5526,6 +5606,37 @@ inputAutoDelayMinutes.addEventListener('blur', () => {
   saveSettings({ silent: true }).catch(() => { });
 });
 
+inputClashBridgeEnabled?.addEventListener('change', () => {
+  updateClashBridgeInputState();
+  markSettingsDirty(true);
+  saveSettings({ silent: true }).catch(() => { });
+});
+
+[
+  inputClashBridgeControllerUrl,
+  inputClashBridgeProxyGroup,
+  inputClashBridgeSecret,
+].forEach((input) => {
+  input?.addEventListener('input', () => {
+    markSettingsDirty(true);
+    scheduleSettingsAutoSave();
+  });
+});
+
+inputClashBridgeControllerUrl?.addEventListener('blur', () => {
+  inputClashBridgeControllerUrl.value = normalizeClashBridgeControllerUrlValue(inputClashBridgeControllerUrl.value);
+  saveSettings({ silent: true }).catch(() => { });
+});
+
+inputClashBridgeProxyGroup?.addEventListener('blur', () => {
+  inputClashBridgeProxyGroup.value = normalizeClashBridgeProxyGroupValue(inputClashBridgeProxyGroup.value);
+  saveSettings({ silent: true }).catch(() => { });
+});
+
+inputClashBridgeSecret?.addEventListener('blur', () => {
+  saveSettings({ silent: true }).catch(() => { });
+});
+
 inputPhoneVerificationEnabled?.addEventListener('change', () => {
   updatePhoneVerificationSettingsUI();
   markSettingsDirty(true);
@@ -5830,6 +5941,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.payload.autoStepDelaySeconds !== undefined) {
         inputAutoStepDelaySeconds.value = formatAutoStepDelayInputValue(message.payload.autoStepDelaySeconds);
       }
+      if (message.payload.clashBridgeEnabled !== undefined && inputClashBridgeEnabled) {
+        inputClashBridgeEnabled.checked = Boolean(message.payload.clashBridgeEnabled);
+        updateClashBridgeInputState();
+      }
+      if (message.payload.clashBridgeControllerUrl !== undefined && inputClashBridgeControllerUrl) {
+        inputClashBridgeControllerUrl.value = normalizeClashBridgeControllerUrlValue(message.payload.clashBridgeControllerUrl);
+      }
+      if (message.payload.clashBridgeProxyGroup !== undefined && inputClashBridgeProxyGroup) {
+        inputClashBridgeProxyGroup.value = normalizeClashBridgeProxyGroupValue(message.payload.clashBridgeProxyGroup);
+      }
+      if (message.payload.clashBridgeSecret !== undefined && inputClashBridgeSecret) {
+        inputClashBridgeSecret.value = message.payload.clashBridgeSecret || '';
+      }
       if (
         (
           message.payload.verificationResendCount !== undefined
@@ -5983,6 +6107,7 @@ loadHeroSmsCountries().catch((err) => {
     syncVpsUrlToggleLabel();
     syncVpsPasswordToggleLabel();
     updatePanelModeUI();
+    updateClashBridgeInputState();
     updateButtonStates();
     updateStatusDisplay(latestState);
     return refreshContributionContentHint()

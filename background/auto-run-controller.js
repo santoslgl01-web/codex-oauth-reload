@@ -29,6 +29,7 @@
       normalizeAutoRunFallbackThreadIntervalMinutes,
       persistAutoRunTimerPlan,
       resetState,
+      rotateClashProxyAfterRound,
       runAutoSequenceFromStep,
       runtime,
       setState,
@@ -381,6 +382,14 @@
               autoRunDelayEnabled: prevState.autoRunDelayEnabled,
               autoRunDelayMinutes: prevState.autoRunDelayMinutes,
               autoStepDelaySeconds: prevState.autoStepDelaySeconds,
+              clashBridgeEnabled: prevState.clashBridgeEnabled,
+              clashBridgeControllerUrl: prevState.clashBridgeControllerUrl,
+              clashBridgeSecret: prevState.clashBridgeSecret,
+              clashBridgeProxyGroup: prevState.clashBridgeProxyGroup,
+              clashBridgeExcludePattern: prevState.clashBridgeExcludePattern,
+              clashBridgeSetRuleMode: prevState.clashBridgeSetRuleMode,
+              clashBridgeLastProxyName: prevState.clashBridgeLastProxyName,
+              clashBridgeCurrentProxyName: prevState.clashBridgeCurrentProxyName,
               mailProvider: prevState.mailProvider,
               emailGenerator: prevState.emailGenerator,
               gmailBaseEmail: prevState.gmailBaseEmail,
@@ -656,6 +665,10 @@
 
         if (stoppedEarly || parkedByTimer) {
           break;
+        }
+
+        if (typeof rotateClashProxyAfterRound === 'function') {
+          await rotateClashProxyAfterRound(targetRun, totalRuns, roundSummary);
         }
 
         try {
