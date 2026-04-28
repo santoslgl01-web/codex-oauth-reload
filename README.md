@@ -105,6 +105,13 @@
 - 默认会跳过香港节点、`DIRECT` / `REJECT` / `GLOBAL` 以及流量、套餐、轮询等元分组名称。
 - 浏览器流量仍需要由 Clash 自身接管：请在 Clash Verge / Mihomo 中开启系统代理或 TUN，并确认 `chatgpt.com`、`auth.openai.com`、`accounts.openai.com` 等规则会走代理节点。
 
+## Ultra1.5.2 更新补充：代理节点同步与一键重启
+
+- `Clash 桥接` 下新增 `节点源 / 更新节点 / 代理节点 / 节点状态`，默认从 `free-nodes/clashfree` 拉取最新 `clashYYYYMMDD.yml`，解析后写入本地 Clash / Mihomo 控制器并展示可用节点。
+- 已同步的节点会参与每轮结束后的 Clash 节点轮换；如果本机 Clash 不允许插件托管配置，则仍可回退使用 Clash 内原有分组节点。
+- 配置菜单新增 `重启插件`。当热更新后新按钮已经显示、但新后台能力还没被当前扩展服务工作线程加载时，点击它会调用 `chrome.runtime.reload()` 重启扩展；即使旧后台还不认识新消息，侧边栏也会直接兜底重启，让新功能立即生效，不需要手动移除再重新加载。
+- 一键重启会保留 `chrome.storage` 中的配置，但会中断正在运行的自动流程；重启前请先停止流程。
+
 ## 2026-04-17 更新补充：Gmail / 2925 别名邮箱
 
 本次版本对 `Gmail` 与 `2925 provide` 的注册邮箱逻辑做了统一整理：

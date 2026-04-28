@@ -75,6 +75,7 @@
         <div id="config-menu" class="header-dropdown" role="menu" aria-labelledby="btn-config-menu" hidden>
           <button id="btn-export-settings" class="header-dropdown-item" type="button" role="menuitem">导出配置</button>
           <button id="btn-import-settings" class="header-dropdown-item" type="button" role="menuitem">导入配置</button>
+          <button id="btn-reload-extension" class="header-dropdown-item" type="button" role="menuitem">重启插件</button>
         </div>
       </div>
     </div>
@@ -400,6 +401,23 @@
           <input type="text" id="input-clash-bridge-proxy-group" class="data-input" placeholder="节点选择" />
           <input type="password" id="input-clash-bridge-secret" class="data-input" placeholder="Secret 可留空" />
         </div>
+      </div>
+      <div class="data-row" id="row-clash-bridge-node-source">
+        <span class="data-label">节点源</span>
+        <div class="data-inline">
+          <input type="text" id="input-proxy-node-source-repo" class="data-input mono" placeholder="free-nodes/clashfree" />
+          <button id="btn-refresh-proxy-nodes" class="btn btn-outline btn-sm data-inline-btn" type="button">更新节点</button>
+        </div>
+      </div>
+      <div class="data-row" id="row-clash-bridge-node-select">
+        <span class="data-label">代理节点</span>
+        <select id="select-proxy-node" class="data-select">
+          <option value="">暂无可用节点</option>
+        </select>
+      </div>
+      <div class="data-row" id="row-clash-bridge-node-status">
+        <span class="data-label">节点状态</span>
+        <span id="display-proxy-node-status" class="data-value mono truncate">未同步</span>
       </div>
       <div class="data-row" id="row-phone-verification-enabled">
         <span class="data-label">接码</span>

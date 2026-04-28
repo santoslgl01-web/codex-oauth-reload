@@ -88,3 +88,64 @@ test('clash bridge rotates the configured selector group through local API', asy
   assert.equal(calls.length, 3);
   assert.equal(logs.some((entry) => /已从“US 01”切换到“JP 01”/.test(entry.message)), true);
 });
+
+test('clash bridge can rotate through synced proxy nodes from storage', async () => {
+  const api = loadModule();
+  const calls = [];
+  let state = {
+    clashBridgeEnabled: true,
+    clashBridgeControllerUrl: 'http://127.0.0.1:9090',
+    clashBridgeSecret: '',
+    clashBridgeProxyGroup: '节点选择',
+    clashBridgeExcludePattern: api.DEFAULT_EXCLUDE_PATTERN,
+    clashBridgeSetRuleMode: false,
+    clashBridgeLastProxyName: 'US 01',
+    proxySelectedNodeId: 'us',
+    proxyNodes: [
+      { id: 'us', name: 'US 01', clashName: 'US 01', usable: true, clashSupported: true },
+      { id: 'jp', name: 'JP 01', clashName: 'JP 01', usable: true, clashSupported: true },
+    ],
+  };
+
+  const bridge = api.createClashBridge({
+    async getState() {
+      return state;
+    },
+    async setState(updates) {
+      state = { ...state, ...updates };
+    },
+    async addLog() {},
+    setTimeout(fn) { return 1; },
+    clearTimeout() {},
+    AbortController,
+    async fetch(url, options = {}) {
+      calls.push({ url, options });
+      if (url.endsWith('/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9') && options.method === 'GET') {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              name: '节点选择',
+              type: 'Selector',
+              now: 'US 01',
+              all: ['DIRECT', 'US 01', 'JP 01', 'HK 01'],
+            };
+          },
+        };
+      }
+      if (url.endsWith('/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9') && options.method === 'PUT') {
+        assert.deepEqual(JSON.parse(options.body), { name: 'JP 01' });
+        return { ok: true, status: 204, async json() { return null; } };
+      }
+      throw new Error(`unexpected fetch ${options.method || 'GET'} ${url}`);
+    },
+  });
+
+  const result = await bridge.rotateAfterRound(1, 2);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.to, 'JP 01');
+  assert.equal(state.proxySelectedNodeId, 'jp');
+  assert.equal(calls.length, 2);
+});

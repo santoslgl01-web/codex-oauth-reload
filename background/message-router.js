@@ -68,7 +68,9 @@
       patchHotmailAccount,
       pollContributionStatus,
       registerTab,
+      refreshProxyNodes,
       requestExtensionUpdate,
+      requestExtensionReload,
       requestStop,
       handleCloudflareSecurityBlocked,
       resetState,
@@ -417,6 +419,28 @@
             reason: message.payload?.reason || 'sidepanel',
             latestVersion: message.payload?.latestVersion || '',
           });
+        }
+
+        case 'REQUEST_EXTENSION_RELOAD': {
+          const state = await getState();
+          if (isAutoRunLockedState(state)) {
+            throw new Error('自动流程运行中，请先停止流程再重启插件。');
+          }
+          if (typeof requestExtensionReload !== 'function') {
+            throw new Error('一键重启能力尚未接入。');
+          }
+          return await requestExtensionReload({
+            reason: message.payload?.reason || 'sidepanel',
+            reloadDelayMs: message.payload?.reloadDelayMs,
+          });
+        }
+
+        case 'REFRESH_PROXY_NODES': {
+          if (typeof refreshProxyNodes !== 'function') {
+            throw new Error('代理节点同步能力尚未接入。');
+          }
+          const result = await refreshProxyNodes(message.payload || {});
+          return { ok: Boolean(result?.ok), ...result, state: await getState() };
         }
 
         case 'RESET': {

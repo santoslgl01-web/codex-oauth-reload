@@ -77,6 +77,7 @@ const btnConfigMenu = document.getElementById('btn-config-menu');
 const configMenu = document.getElementById('config-menu');
 const btnExportSettings = document.getElementById('btn-export-settings');
 const btnImportSettings = document.getElementById('btn-import-settings');
+const btnReloadExtension = document.getElementById('btn-reload-extension');
 const inputImportSettingsFile = document.getElementById('input-import-settings-file');
 const selectPanelMode = document.getElementById('select-panel-mode');
 const rowVpsUrl = document.getElementById('row-vps-url');
@@ -238,6 +239,10 @@ const inputClashBridgeEnabled = document.getElementById('input-clash-bridge-enab
 const inputClashBridgeControllerUrl = document.getElementById('input-clash-bridge-controller-url');
 const inputClashBridgeProxyGroup = document.getElementById('input-clash-bridge-proxy-group');
 const inputClashBridgeSecret = document.getElementById('input-clash-bridge-secret');
+const inputProxyNodeSourceRepo = document.getElementById('input-proxy-node-source-repo');
+const btnRefreshProxyNodes = document.getElementById('btn-refresh-proxy-nodes');
+const selectProxyNode = document.getElementById('select-proxy-node');
+const displayProxyNodeStatus = document.getElementById('display-proxy-node-status');
 const inputVerificationResendCount = document.getElementById('input-verification-resend-count');
 const rowPhoneVerificationEnabled = document.getElementById('row-phone-verification-enabled');
 const inputPhoneVerificationEnabled = document.getElementById('input-phone-verification-enabled');
@@ -328,6 +333,18 @@ const CONTRIBUTION_UPLOAD_URL = 'https://key.jcid.xyz/';
 const DEFAULT_PHONE_VERIFICATION_ENABLED = false;
 const DEFAULT_HERO_SMS_COUNTRY_ID = 52;
 const DEFAULT_HERO_SMS_COUNTRY_LABEL = 'Thailand';
+const DEFAULT_PROXY_NODE_SOURCE_REPO = 'free-nodes/clashfree';
+const DEFAULT_PROXY_RULE_DOMAINS = [
+  'chatgpt.com',
+  'openai.com',
+  'auth.openai.com',
+  'auth0.openai.com',
+  'accounts.openai.com',
+  'api.openai.com',
+];
+const DEFAULT_CLASH_PROXY_HOST = '127.0.0.1';
+const DEFAULT_CLASH_MIXED_PORT = 7890;
+const DEFAULT_CLASH_DELAY_TEST_URL = 'https://chatgpt.com/cdn-cgi/trace';
 
 function getManagedAliasUtils() {
   return window.MultiPageManagedAliasUtils || null;
@@ -1308,6 +1325,9 @@ function updateConfigMenuControls() {
   if (btnImportSettings) {
     btnImportSettings.disabled = importLocked;
   }
+  if (btnReloadExtension) {
+    btnReloadExtension.disabled = importLocked;
+  }
 }
 
 function closeConfigMenu() {
@@ -1549,6 +1569,140 @@ function normalizeClashBridgeProxyGroupValue(value = '') {
   return String(value || '').trim() || '节点选择';
 }
 
+function normalizeProxyNodeSourceRepoValue(value = '') {
+  const fallback = DEFAULT_PROXY_NODE_SOURCE_REPO;
+  const raw = String(value || '').trim() || fallback;
+  const withoutUrl = raw
+    .replace(/^https?:\/\/github\.com\//i, '')
+    .replace(/^git@github\.com:/i, '')
+    .replace(/\.git$/i, '')
+    .replace(/^\/+|\/+$/g, '');
+  const parts = withoutUrl.split('/').map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) {
+    return fallback;
+  }
+  return `${parts[0]}/${parts[1]}`;
+}
+
+function normalizeProxyNodes(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      ...item,
+      id: String(item.id || '').trim(),
+      name: String(item.name || item.clashName || '').trim(),
+      clashName: String(item.clashName || item.name || '').trim(),
+    }))
+    .filter((item) => item.id && (item.name || item.clashName));
+}
+
+function formatProxyNodeOptionLabel(node) {
+  const parts = [];
+  const countryName = String(node?.detectedCountryName || '').trim();
+  const countryCode = String(node?.detectedCountryCode || node?.countryCode || '').trim().toUpperCase();
+  const region = String(node?.detectedRegion || '').trim();
+  if (countryName) {
+    parts.push(region ? `${countryName}-${region}` : countryName);
+  } else if (countryCode) {
+    parts.push(region ? `${countryCode}-${region}` : countryCode);
+  }
+
+  const detectedIp = String(node?.detectedIp || '').trim();
+  if (detectedIp) {
+    parts.push(detectedIp);
+  }
+  if (node?.type) {
+    parts.push(String(node.type).toUpperCase());
+  }
+  parts.push(String(node?.clashName || node?.name || `${node?.server || ''}:${node?.port || ''}`).trim());
+  const latencyMs = Math.max(0, Math.floor(Number(node?.latencyMs) || 0));
+  if (latencyMs > 0) {
+    parts.push(`${latencyMs}ms`);
+  }
+  if (node?.usable === false) {
+    parts.push(node?.status === 'bridge_only' ? '需在 Clash 内管理' : '不可用');
+  }
+  return parts.filter(Boolean).join(' · ');
+}
+
+function renderProxyNodeOptions(state = latestState) {
+  if (!selectProxyNode) {
+    return;
+  }
+
+  const nodes = normalizeProxyNodes(state?.proxyNodes || []);
+  const selectedNodeId = String(state?.proxySelectedNodeId || '').trim();
+  selectProxyNode.innerHTML = '';
+
+  if (!nodes.length) {
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = '暂无可用节点';
+    selectProxyNode.appendChild(emptyOption);
+    selectProxyNode.disabled = isAutoRunLockedPhase();
+    return;
+  }
+
+  nodes.forEach((node) => {
+    const option = document.createElement('option');
+    option.value = node.id;
+    option.textContent = formatProxyNodeOptionLabel(node);
+    selectProxyNode.appendChild(option);
+  });
+
+  const firstUsableNode = nodes.find((node) => node.usable !== false) || nodes[0];
+  selectProxyNode.value = nodes.some((node) => node.id === selectedNodeId)
+    ? selectedNodeId
+    : (firstUsableNode?.id || '');
+  selectProxyNode.disabled = isAutoRunLockedPhase();
+}
+
+function updateProxyNodeStatus(state = latestState) {
+  if (!displayProxyNodeStatus) {
+    return;
+  }
+
+  const nodes = normalizeProxyNodes(state?.proxyNodes || []);
+  const total = nodes.length;
+  const usable = nodes.filter((node) => node.usable !== false).length;
+  const usableLatencies = nodes
+    .filter((node) => node.usable !== false)
+    .map((node) => Math.max(0, Math.floor(Number(node?.latencyMs) || 0)))
+    .filter((value) => value > 0);
+  const sourceRepo = normalizeProxyNodeSourceRepoValue(state?.proxyNodeSourceRepo || DEFAULT_PROXY_NODE_SOURCE_REPO);
+  const sourceFile = String(state?.proxyNodeSourceFile || '').trim();
+  const lastError = String(state?.proxyNodeLastError || '').trim();
+  const refreshedAt = Number(state?.proxyNodeLastRefreshAt) || 0;
+
+  if (lastError) {
+    displayProxyNodeStatus.textContent = `同步失败：${lastError}`;
+    return;
+  }
+
+  if (!total) {
+    if (sourceFile) {
+      const refreshedText = refreshedAt ? new Date(refreshedAt).toLocaleString() : '未知时间';
+      displayProxyNodeStatus.textContent = `已同步 ${sourceFile} · 未发现可用节点 · ${refreshedText}`;
+      return;
+    }
+    displayProxyNodeStatus.textContent = `未同步 · ${sourceRepo}`;
+    return;
+  }
+
+  const refreshedText = refreshedAt ? new Date(refreshedAt).toLocaleString() : '未知时间';
+  const avgLatency = usableLatencies.length
+    ? Math.round(usableLatencies.reduce((sum, value) => sum + value, 0) / usableLatencies.length)
+    : 0;
+  const minLatency = usableLatencies.length ? Math.min(...usableLatencies) : 0;
+  const latencyText = usableLatencies.length
+    ? ` · 延迟均值 ${avgLatency}ms（最低 ${minLatency}ms）`
+    : '';
+  displayProxyNodeStatus.textContent = `${usable}/${total} 可用 · ${sourceFile || sourceRepo} · ${refreshedText}${latencyText}`;
+}
+
 function normalizeVerificationResendCount(value, fallback) {
   const rawValue = String(value ?? '').trim();
   if (!rawValue) {
@@ -1670,11 +1824,16 @@ function updateClashBridgeInputState() {
     typeof inputClashBridgeControllerUrl !== 'undefined' ? inputClashBridgeControllerUrl : null,
     typeof inputClashBridgeProxyGroup !== 'undefined' ? inputClashBridgeProxyGroup : null,
     typeof inputClashBridgeSecret !== 'undefined' ? inputClashBridgeSecret : null,
+    typeof inputProxyNodeSourceRepo !== 'undefined' ? inputProxyNodeSourceRepo : null,
+    typeof selectProxyNode !== 'undefined' ? selectProxyNode : null,
   ].forEach((input) => {
     if (input) {
       input.disabled = locked;
     }
   });
+  if (typeof btnRefreshProxyNodes !== 'undefined' && btnRefreshProxyNodes) {
+    btnRefreshProxyNodes.disabled = locked;
+  }
   if (typeof rowClashBridgeProxyGroup !== 'undefined' && rowClashBridgeProxyGroup) {
     rowClashBridgeProxyGroup.classList.toggle('is-disabled', !enabled);
   }
@@ -1996,6 +2155,39 @@ function collectSettingsPayload() {
   const normalizeClashGroup = typeof normalizeClashBridgeProxyGroupValue === 'function'
     ? normalizeClashBridgeProxyGroupValue
     : ((value = '') => String(value || '').trim() || '节点选择');
+  const normalizeProxyRepo = typeof normalizeProxyNodeSourceRepoValue === 'function'
+    ? normalizeProxyNodeSourceRepoValue
+    : ((value = '') => String(value || '').trim() || 'free-nodes/clashfree');
+  const defaultProxyRuleDomains = typeof DEFAULT_PROXY_RULE_DOMAINS !== 'undefined'
+    ? DEFAULT_PROXY_RULE_DOMAINS
+    : ['chatgpt.com', 'openai.com', 'auth.openai.com', 'auth0.openai.com', 'accounts.openai.com', 'api.openai.com'];
+  const defaultClashProxyHost = typeof DEFAULT_CLASH_PROXY_HOST !== 'undefined'
+    ? DEFAULT_CLASH_PROXY_HOST
+    : '127.0.0.1';
+  const defaultClashMixedPort = typeof DEFAULT_CLASH_MIXED_PORT !== 'undefined'
+    ? DEFAULT_CLASH_MIXED_PORT
+    : 7890;
+  const defaultClashDelayTestUrl = typeof DEFAULT_CLASH_DELAY_TEST_URL !== 'undefined'
+    ? DEFAULT_CLASH_DELAY_TEST_URL
+    : 'https://chatgpt.com/cdn-cgi/trace';
+  const clashBridgeEnabled = typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled
+    ? Boolean(inputClashBridgeEnabled.checked)
+    : Boolean(latestState?.clashBridgeEnabled);
+  const clashBridgeControllerUrl = typeof inputClashBridgeControllerUrl !== 'undefined' && inputClashBridgeControllerUrl
+    ? normalizeClashController(inputClashBridgeControllerUrl.value)
+    : normalizeClashController(latestState?.clashBridgeControllerUrl);
+  const clashBridgeSecret = typeof inputClashBridgeSecret !== 'undefined' && inputClashBridgeSecret
+    ? (inputClashBridgeSecret.value || '')
+    : String(latestState?.clashBridgeSecret || '');
+  const clashBridgeProxyGroup = typeof inputClashBridgeProxyGroup !== 'undefined' && inputClashBridgeProxyGroup
+    ? normalizeClashGroup(inputClashBridgeProxyGroup.value)
+    : normalizeClashGroup(latestState?.clashBridgeProxyGroup);
+  const proxyNodeSourceRepo = typeof inputProxyNodeSourceRepo !== 'undefined' && inputProxyNodeSourceRepo
+    ? normalizeProxyRepo(inputProxyNodeSourceRepo.value)
+    : normalizeProxyRepo(latestState?.proxyNodeSourceRepo);
+  const proxySelectedNodeId = typeof selectProxyNode !== 'undefined' && selectProxyNode
+    ? String(selectProxyNode.value || '').trim()
+    : String(latestState?.proxySelectedNodeId || '').trim();
   return {
     ...(contributionModeEnabled ? {} : {
       panelMode: selectPanelMode.value,
@@ -2068,18 +2260,21 @@ function collectSettingsPayload() {
     autoRunDelayEnabled: inputAutoDelayEnabled.checked,
     autoRunDelayMinutes: normalizeAutoDelayMinutes(inputAutoDelayMinutes.value),
     autoStepDelaySeconds: normalizeAutoStepDelaySeconds(inputAutoStepDelaySeconds.value),
-    clashBridgeEnabled: typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled
-      ? Boolean(inputClashBridgeEnabled.checked)
-      : Boolean(latestState?.clashBridgeEnabled),
-    clashBridgeControllerUrl: typeof inputClashBridgeControllerUrl !== 'undefined' && inputClashBridgeControllerUrl
-      ? normalizeClashController(inputClashBridgeControllerUrl.value)
-      : normalizeClashController(latestState?.clashBridgeControllerUrl),
-    clashBridgeSecret: typeof inputClashBridgeSecret !== 'undefined' && inputClashBridgeSecret
-      ? (inputClashBridgeSecret.value || '')
-      : String(latestState?.clashBridgeSecret || ''),
-    clashBridgeProxyGroup: typeof inputClashBridgeProxyGroup !== 'undefined' && inputClashBridgeProxyGroup
-      ? normalizeClashGroup(inputClashBridgeProxyGroup.value)
-      : normalizeClashGroup(latestState?.clashBridgeProxyGroup),
+    clashBridgeEnabled,
+    clashBridgeControllerUrl,
+    clashBridgeSecret,
+    clashBridgeProxyGroup,
+    proxyNodeSourceRepo,
+    proxySelectedNodeId,
+    proxyBackend: 'clash',
+    proxyMode: clashBridgeEnabled ? 'rule' : 'off',
+    proxyRuleDomains: [...defaultProxyRuleDomains],
+    clashControlUrl: clashBridgeControllerUrl,
+    clashSecret: clashBridgeSecret,
+    clashProxyHost: String(latestState?.clashProxyHost || defaultClashProxyHost).trim() || defaultClashProxyHost,
+    clashMixedPort: Number(latestState?.clashMixedPort || defaultClashMixedPort) || defaultClashMixedPort,
+    clashSelectorGroup: clashBridgeProxyGroup,
+    clashDelayTestUrl: String(latestState?.clashDelayTestUrl || defaultClashDelayTestUrl).trim() || defaultClashDelayTestUrl,
     phoneVerificationEnabled: Boolean(inputPhoneVerificationEnabled?.checked),
     verificationResendCount: normalizeVerificationResendCount(
       inputVerificationResendCount?.value,
@@ -2395,6 +2590,137 @@ async function saveSettings(options = {}) {
   }
 }
 
+async function requestProxyNodeRefresh(options = {}) {
+  const { silent = false } = options;
+  if (!btnRefreshProxyNodes) {
+    return null;
+  }
+
+  const originalText = btnRefreshProxyNodes.textContent;
+  btnRefreshProxyNodes.disabled = true;
+  btnRefreshProxyNodes.textContent = '更新中...';
+
+  try {
+    const repo = inputProxyNodeSourceRepo
+      ? normalizeProxyNodeSourceRepoValue(inputProxyNodeSourceRepo.value)
+      : normalizeProxyNodeSourceRepoValue(latestState?.proxyNodeSourceRepo);
+    if (inputProxyNodeSourceRepo) {
+      inputProxyNodeSourceRepo.value = repo;
+    }
+    const clashControlUrl = inputClashBridgeControllerUrl
+      ? normalizeClashBridgeControllerUrlValue(inputClashBridgeControllerUrl.value)
+      : normalizeClashBridgeControllerUrlValue(latestState?.clashBridgeControllerUrl);
+    const clashSelectorGroup = inputClashBridgeProxyGroup
+      ? normalizeClashBridgeProxyGroupValue(inputClashBridgeProxyGroup.value)
+      : normalizeClashBridgeProxyGroupValue(latestState?.clashBridgeProxyGroup);
+
+    const response = await chrome.runtime.sendMessage({
+      type: 'REFRESH_PROXY_NODES',
+      source: 'sidepanel',
+      payload: {
+        trigger: 'manual',
+        backend: 'clash',
+        repo,
+        requestTimeoutMs: 10000,
+        timeoutMs: 5000,
+        probeLimit: 300,
+        clashControlUrl,
+        clashSecret: inputClashBridgeSecret ? (inputClashBridgeSecret.value || '') : String(latestState?.clashBridgeSecret || ''),
+        clashProxyHost: String(latestState?.clashProxyHost || DEFAULT_CLASH_PROXY_HOST).trim() || DEFAULT_CLASH_PROXY_HOST,
+        clashMixedPort: Number(latestState?.clashMixedPort || DEFAULT_CLASH_MIXED_PORT) || DEFAULT_CLASH_MIXED_PORT,
+        clashSelectorGroup,
+        clashDelayTestUrl: String(latestState?.clashDelayTestUrl || DEFAULT_CLASH_DELAY_TEST_URL).trim() || DEFAULT_CLASH_DELAY_TEST_URL,
+      },
+    });
+
+    if (response?.error || response?.ok === false) {
+      throw new Error(response.error || '代理节点同步失败。');
+    }
+
+    if (response?.state) {
+      applySettingsState(response.state);
+    } else {
+      renderProxyNodeOptions(latestState);
+      updateProxyNodeStatus(latestState);
+    }
+
+    if (!silent) {
+      const usableCount = Number(response?.summary?.usable);
+      showToast(
+        Number.isFinite(usableCount)
+          ? `代理节点已同步：${usableCount} 个可用`
+          : '代理节点已同步',
+        'success',
+        1800
+      );
+    }
+    return response || { ok: true };
+  } catch (err) {
+    if (!silent) {
+      showToast(`同步代理节点失败：${err.message}`, 'error');
+    }
+    throw err;
+  } finally {
+    btnRefreshProxyNodes.disabled = isAutoRunLockedPhase();
+    btnRefreshProxyNodes.textContent = originalText;
+  }
+}
+
+async function requestExtensionReloadFromSidepanel() {
+  const confirmed = await openConfirmModal({
+    title: '重启插件',
+    message: '热更新下载完成后，如果新功能按钮已经出现但点了没反应，可以用这个按钮让扩展服务工作线程重新加载，新功能会在几秒后生效。',
+    confirmLabel: '立即重启',
+    confirmVariant: 'btn-primary',
+    alert: isAutoRunLockedPhase()
+      ? { text: '当前自动流程仍在运行，请先停止流程再重启。', tone: 'danger' }
+      : null,
+  });
+  if (!confirmed) {
+    return null;
+  }
+
+  closeConfigMenu();
+  if (btnReloadExtension) {
+    btnReloadExtension.disabled = true;
+    btnReloadExtension.textContent = '重启中...';
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'REQUEST_EXTENSION_RELOAD',
+      source: 'sidepanel',
+      payload: {
+        reason: 'sidepanel_manual_reload',
+        reloadDelayMs: 500,
+      },
+    });
+    if (response?.error || response?.ok === false) {
+      throw new Error(response.error || response?.message || '重启插件失败。');
+    }
+    showToast(response?.message || '插件正在重启，几秒后新功能会重新加载生效。', 'success', 2200);
+    return response || { ok: true };
+  } catch (err) {
+    if (typeof chrome !== 'undefined' && chrome?.runtime?.reload) {
+      showToast('后台尚未加载新重启接口，已改为从侧边栏直接重启插件。', 'warn', 2200);
+      setTimeout(() => {
+        try {
+          chrome.runtime.reload();
+        } catch {
+          // Ignore; the button state is restored below if direct reload fails.
+        }
+      }, 500);
+      return { ok: true, willReload: true, fallback: 'sidepanel_runtime_reload' };
+    }
+    showToast(`重启插件失败：${err.message}`, 'error');
+    if (btnReloadExtension) {
+      btnReloadExtension.disabled = false;
+      btnReloadExtension.textContent = '重启插件';
+    }
+    throw err;
+  }
+}
+
 function applyAutoRunStatus(payload = currentAutoRun) {
   syncAutoRunState(payload);
   const runLabel = getAutoRunLabel(currentAutoRun);
@@ -2651,6 +2977,17 @@ function applySettingsState(state) {
   }
   if (typeof inputClashBridgeSecret !== 'undefined' && inputClashBridgeSecret) {
     inputClashBridgeSecret.value = state?.clashBridgeSecret || '';
+  }
+  if (typeof inputProxyNodeSourceRepo !== 'undefined' && inputProxyNodeSourceRepo) {
+    inputProxyNodeSourceRepo.value = typeof normalizeProxyNodeSourceRepoValue === 'function'
+      ? normalizeProxyNodeSourceRepoValue(state?.proxyNodeSourceRepo)
+      : String(state?.proxyNodeSourceRepo || 'free-nodes/clashfree').trim();
+  }
+  if (typeof renderProxyNodeOptions === 'function') {
+    renderProxyNodeOptions(state);
+  }
+  if (typeof updateProxyNodeStatus === 'function') {
+    updateProxyNodeStatus(state);
   }
   if (inputVerificationResendCount) {
     const restoredVerificationResendCount = state?.verificationResendCount !== undefined
@@ -4877,6 +5214,13 @@ btnImportSettings?.addEventListener('click', async () => {
   }
 });
 
+btnReloadExtension?.addEventListener('click', async () => {
+  if (configActionInFlight || settingsSaveInFlight) {
+    return;
+  }
+  await requestExtensionReloadFromSidepanel().catch(() => {});
+});
+
 inputImportSettingsFile?.addEventListener('change', async () => {
   const file = inputImportSettingsFile.files?.[0] || null;
   await importSettingsFromFile(file);
@@ -5616,6 +5960,7 @@ inputClashBridgeEnabled?.addEventListener('change', () => {
   inputClashBridgeControllerUrl,
   inputClashBridgeProxyGroup,
   inputClashBridgeSecret,
+  inputProxyNodeSourceRepo,
 ].forEach((input) => {
   input?.addEventListener('input', () => {
     markSettingsDirty(true);
@@ -5635,6 +5980,20 @@ inputClashBridgeProxyGroup?.addEventListener('blur', () => {
 
 inputClashBridgeSecret?.addEventListener('blur', () => {
   saveSettings({ silent: true }).catch(() => { });
+});
+
+inputProxyNodeSourceRepo?.addEventListener('blur', () => {
+  inputProxyNodeSourceRepo.value = normalizeProxyNodeSourceRepoValue(inputProxyNodeSourceRepo.value);
+  saveSettings({ silent: true }).catch(() => { });
+});
+
+selectProxyNode?.addEventListener('change', () => {
+  markSettingsDirty(true);
+  saveSettings({ silent: true }).catch(() => { });
+});
+
+btnRefreshProxyNodes?.addEventListener('click', () => {
+  requestProxyNodeRefresh().catch(() => {});
 });
 
 inputPhoneVerificationEnabled?.addEventListener('change', () => {
@@ -5953,6 +6312,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       if (message.payload.clashBridgeSecret !== undefined && inputClashBridgeSecret) {
         inputClashBridgeSecret.value = message.payload.clashBridgeSecret || '';
+      }
+      if (message.payload.proxyNodeSourceRepo !== undefined && inputProxyNodeSourceRepo) {
+        inputProxyNodeSourceRepo.value = normalizeProxyNodeSourceRepoValue(message.payload.proxyNodeSourceRepo);
+      }
+      if (
+        message.payload.proxyNodes !== undefined
+        || message.payload.proxySelectedNodeId !== undefined
+      ) {
+        renderProxyNodeOptions(latestState);
+      }
+      if (
+        message.payload.proxyNodes !== undefined
+        || message.payload.proxyNodeSourceRepo !== undefined
+        || message.payload.proxyNodeSourceFile !== undefined
+        || message.payload.proxyNodeLastRefreshAt !== undefined
+        || message.payload.proxyNodeLastError !== undefined
+      ) {
+        updateProxyNodeStatus(latestState);
       }
       if (
         (

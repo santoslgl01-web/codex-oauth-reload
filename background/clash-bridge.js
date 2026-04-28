@@ -68,6 +68,20 @@
     );
   }
 
+  function getStoredClashProxyNodes(state = {}) {
+    if (!Array.isArray(state.proxyNodes)) {
+      return [];
+    }
+    return state.proxyNodes
+      .filter((node) => node && typeof node === 'object')
+      .map((node) => ({
+        ...node,
+        id: String(node.id || '').trim(),
+        name: String(node.clashName || node.name || '').trim(),
+      }))
+      .filter((node) => node.name && node.usable !== false && node.clashSupported !== false);
+  }
+
   function pickNextProxyName(proxyNames = [], currentName = '', lastName = '', excludePattern = DEFAULT_EXCLUDE_PATTERN) {
     const allNames = uniqueStrings(proxyNames);
     if (!allNames.length) {
@@ -224,7 +238,10 @@
       }
 
       const group = await fetchProxyGroup(state);
-      const proxyNames = getGroupProxyNames(group);
+      const storedNodes = getStoredClashProxyNodes(state);
+      const proxyNames = storedNodes.length
+        ? storedNodes.map((node) => node.name)
+        : getGroupProxyNames(group);
       const currentName = String(group?.now || '').trim();
       const nextName = pickNextProxyName(
         proxyNames,
@@ -241,6 +258,9 @@
       await setState({
         clashBridgeLastProxyName: nextName,
         clashBridgeCurrentProxyName: nextName,
+        ...(storedNodes.length
+          ? { proxySelectedNodeId: storedNodes.find((node) => node.name === nextName)?.id || state.proxySelectedNodeId || '' }
+          : {}),
       });
 
       return {

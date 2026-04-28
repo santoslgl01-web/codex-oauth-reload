@@ -15,3 +15,12 @@ test('message router module exposes a factory', () => {
 
   assert.equal(typeof api?.createMessageRouter, 'function');
 });
+
+test('message router exposes proxy refresh and extension reload actions', () => {
+  const source = fs.readFileSync('background/message-router.js', 'utf8');
+
+  assert.match(source, /case 'REFRESH_PROXY_NODES'/);
+  assert.match(source, /case 'REQUEST_EXTENSION_RELOAD'/);
+  assert.match(source, /refreshProxyNodes/);
+  assert.match(source, /requestExtensionReload/);
+});

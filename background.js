@@ -7,6 +7,7 @@ importScripts(
   'background/account-run-history.js',
   'background/contribution-oauth.js',
   'background/mail-2925-session.js',
+  'background/proxy-node-manager.js',
   'background/panel-bridge.js',
   'background/generated-email-helpers.js',
   'background/signup-flow-helpers.js',
@@ -164,6 +165,16 @@ const runtimeUpdateManager = self.MultiPageRuntimeUpdate?.createRuntimeUpdateMan
   setTimeout,
   clearTimeout,
 });
+async function requestExtensionReload(options = {}) {
+  const scheduled = runtimeUpdateManager?.scheduleReload?.(Number(options.reloadDelayMs) || 300);
+  return {
+    ok: Boolean(scheduled),
+    willReload: Boolean(scheduled),
+    message: scheduled
+      ? '插件正在重启，几秒后新功能会重新加载生效。'
+      : '当前浏览器不支持自动重启插件，请到扩展管理页手动重新加载。',
+  };
+}
 const DUCK_AUTOFILL_URL = 'https://duckduckgo.com/email/settings/autofill';
 const ICLOUD_SETUP_URLS = [
   'https://setup.icloud.com.cn/setup/ws/1',
@@ -245,6 +256,9 @@ const DEFAULT_ACCOUNT_RUN_HISTORY_HELPER_BASE_URL = DEFAULT_HOTMAIL_LOCAL_BASE_U
 const DEFAULT_CLASH_BRIDGE_CONTROLLER_URL = self.MultiPageBackgroundClashBridge?.DEFAULT_CONTROLLER_URL || 'http://127.0.0.1:9090';
 const DEFAULT_CLASH_BRIDGE_PROXY_GROUP = self.MultiPageBackgroundClashBridge?.DEFAULT_PROXY_GROUP || '节点选择';
 const DEFAULT_CLASH_BRIDGE_EXCLUDE_PATTERN = self.MultiPageBackgroundClashBridge?.DEFAULT_EXCLUDE_PATTERN || '香港|hong[ -]?kong|\\bhk\\b|\\bhkg\\b|🇭🇰|DIRECT|REJECT|GLOBAL|自动|故障|负载|轮询|剩余流量|套餐|到期|traffic|expire|subscription|reset';
+const DEFAULT_PROXY_NODE_SOURCE_REPO = 'free-nodes/clashfree';
+const PROXY_NODE_REFRESH_ALARM_NAME = 'proxy-node-refresh';
+const PROXY_NODE_ROTATE_ALARM_NAME = 'proxy-node-rotate';
 const HOTMAIL_LOCAL_HELPER_TIMEOUT_MS = 45000;
 const DEFAULT_LUCKMAIL_PROJECT_CODE = 'openai';
 const DEFAULT_HERO_SMS_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php';
@@ -403,6 +417,30 @@ const PERSISTED_SETTING_DEFAULTS = {
   clashBridgeProxyGroup: DEFAULT_CLASH_BRIDGE_PROXY_GROUP,
   clashBridgeExcludePattern: DEFAULT_CLASH_BRIDGE_EXCLUDE_PATTERN,
   clashBridgeSetRuleMode: true,
+  proxyNodeSourceRepo: DEFAULT_PROXY_NODE_SOURCE_REPO,
+  proxyNodeSourceFile: '',
+  proxyNodeLastRefreshAt: 0,
+  proxyNodeLastError: '',
+  proxyNodes: [],
+  proxySelectedNodeId: '',
+  proxySmsNodeId: '',
+  proxyAutoRefreshEnabled: false,
+  proxyBackend: 'clash',
+  proxyMode: 'off',
+  proxyRuleDomains: [
+    'chatgpt.com',
+    'openai.com',
+    'auth.openai.com',
+    'auth0.openai.com',
+    'accounts.openai.com',
+    'api.openai.com',
+  ],
+  clashControlUrl: DEFAULT_CLASH_BRIDGE_CONTROLLER_URL,
+  clashSecret: '',
+  clashProxyHost: '127.0.0.1',
+  clashMixedPort: 7890,
+  clashSelectorGroup: DEFAULT_CLASH_BRIDGE_PROXY_GROUP,
+  clashDelayTestUrl: 'https://chatgpt.com/cdn-cgi/trace',
   phoneVerificationEnabled: false,
   verificationResendCount: DEFAULT_VERIFICATION_RESEND_COUNT,
   mailProvider: '163',
@@ -1083,6 +1121,32 @@ function normalizeClashBridgeExcludePattern(value = '') {
   return String(value || '').trim() || DEFAULT_CLASH_BRIDGE_EXCLUDE_PATTERN;
 }
 
+function normalizeProxyNodeId(value = '') {
+  return String(value || '').trim();
+}
+
+function normalizeProxyNodeList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item) => item && typeof item === 'object');
+}
+
+function normalizeProxyRuleDomains(value) {
+  const domains = Array.isArray(value) ? value : PERSISTED_SETTING_DEFAULTS.proxyRuleDomains;
+  const seen = new Set();
+  const normalized = [];
+  for (const item of domains) {
+    const domain = String(item || '').trim().toLowerCase().replace(/^\.+/, '');
+    if (!domain || !/^[a-z0-9.-]+$/.test(domain) || seen.has(domain)) {
+      continue;
+    }
+    seen.add(domain);
+    normalized.push(domain);
+  }
+  return normalized.length ? normalized : [...PERSISTED_SETTING_DEFAULTS.proxyRuleDomains];
+}
+
 function getHotmailServiceSettings(state = {}) {
   return {
     mode: normalizeHotmailServiceMode(state.hotmailServiceMode),
@@ -1178,6 +1242,44 @@ function normalizePersistentSettingValue(key, value) {
       return normalizeClashBridgeProxyGroup(value);
     case 'clashBridgeExcludePattern':
       return normalizeClashBridgeExcludePattern(value);
+    case 'proxyNodeSourceRepo':
+      return String(value || DEFAULT_PROXY_NODE_SOURCE_REPO).trim() || DEFAULT_PROXY_NODE_SOURCE_REPO;
+    case 'proxyNodeSourceFile':
+    case 'proxyNodeLastError':
+      return String(value || '').trim();
+    case 'proxyNodeLastRefreshAt': {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : 0;
+    }
+    case 'proxyNodes':
+      return normalizeProxyNodeList(value);
+    case 'proxySelectedNodeId':
+    case 'proxySmsNodeId':
+      return normalizeProxyNodeId(value);
+    case 'proxyAutoRefreshEnabled':
+      return Boolean(value);
+    case 'proxyBackend':
+      return 'clash';
+    case 'proxyMode':
+      if (String(value || '').trim().toLowerCase() === 'global') return 'global';
+      if (String(value || '').trim().toLowerCase() === 'rule') return 'rule';
+      return 'off';
+    case 'proxyRuleDomains':
+      return normalizeProxyRuleDomains(value);
+    case 'clashControlUrl':
+      return normalizeClashBridgeControllerUrl(value);
+    case 'clashSecret':
+      return String(value || '');
+    case 'clashProxyHost':
+      return String(value || '127.0.0.1').trim() || '127.0.0.1';
+    case 'clashMixedPort': {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) && numeric > 0 && numeric <= 65535 ? Math.floor(numeric) : 7890;
+    }
+    case 'clashSelectorGroup':
+      return normalizeClashBridgeProxyGroup(value);
+    case 'clashDelayTestUrl':
+      return String(value || 'https://chatgpt.com/cdn-cgi/trace').trim() || 'https://chatgpt.com/cdn-cgi/trace';
     case 'verificationResendCount':
       return normalizeVerificationResendCount(value, DEFAULT_VERIFICATION_RESEND_COUNT);
     case 'mailProvider':
@@ -7360,6 +7462,58 @@ const clashBridgeManager = self.MultiPageBackgroundClashBridge?.createClashBridg
   clearTimeout,
 });
 
+function mapProxyNodeManagerUpdates(updates = {}) {
+  const mapped = { ...(updates || {}) };
+  if (updates.clashControlUrl !== undefined) {
+    mapped.clashBridgeControllerUrl = updates.clashControlUrl;
+  }
+  if (updates.clashSecret !== undefined) {
+    mapped.clashBridgeSecret = updates.clashSecret;
+  }
+  if (updates.clashSelectorGroup !== undefined) {
+    mapped.clashBridgeProxyGroup = updates.clashSelectorGroup;
+  }
+  return mapped;
+}
+
+const proxyNodeManager = self.MultiPageBackgroundProxyNodeManager?.createProxyNodeManager?.({
+  addLog,
+  broadcastDataUpdate: (updates = {}) => broadcastDataUpdate(mapProxyNodeManagerUpdates(updates)),
+  chrome,
+  fetchImpl: (...args) => fetch(...args),
+  getState,
+  setPersistentSettings: (updates = {}) => setPersistentSettings(mapProxyNodeManagerUpdates(updates)),
+  setState: (updates = {}) => setState(mapProxyNodeManagerUpdates(updates)),
+  PROXY_NODE_REFRESH_ALARM_NAME,
+  PROXY_NODE_ROTATE_ALARM_NAME,
+  DEFAULT_PROXY_NODE_SOURCE_REPO,
+});
+
+async function refreshProxyNodes(options = {}) {
+  if (!proxyNodeManager?.refreshProxyNodes) {
+    throw new Error('代理节点管理模块未初始化。');
+  }
+
+  const state = await getState();
+  return proxyNodeManager.refreshProxyNodes({
+    ...options,
+    trigger: options.trigger || 'manual',
+    backend: 'clash',
+    repo: String(options.repo || state.proxyNodeSourceRepo || DEFAULT_PROXY_NODE_SOURCE_REPO).trim() || DEFAULT_PROXY_NODE_SOURCE_REPO,
+    clashControlUrl: options.clashControlUrl || state.clashBridgeControllerUrl || DEFAULT_CLASH_BRIDGE_CONTROLLER_URL,
+    clashSecret: options.clashSecret ?? state.clashBridgeSecret ?? '',
+    clashProxyHost: options.clashProxyHost || state.clashProxyHost || '127.0.0.1',
+    clashMixedPort: options.clashMixedPort || state.clashMixedPort || 7890,
+    clashSelectorGroup: options.clashSelectorGroup || state.clashBridgeProxyGroup || DEFAULT_CLASH_BRIDGE_PROXY_GROUP,
+    clashDelayTestUrl: options.clashDelayTestUrl || state.clashDelayTestUrl || 'https://chatgpt.com/cdn-cgi/trace',
+    probeLimit: options.probeLimit || 12,
+  });
+}
+
+async function rotateClashProxyAfterRound(targetRun, totalRuns, roundSummary) {
+  return clashBridgeManager?.rotateAfterRound?.(targetRun, totalRuns, roundSummary);
+}
+
 const autoRunController = self.MultiPageBackgroundAutoRunController?.createAutoRunController({
   addLog,
   appendAccountRunRecord: (...args) => appendAndBroadcastAccountRunRecord(...args),
@@ -7388,7 +7542,7 @@ const autoRunController = self.MultiPageBackgroundAutoRunController?.createAutoR
   normalizeAutoRunFallbackThreadIntervalMinutes,
   persistAutoRunTimerPlan,
   resetState,
-  rotateClashProxyAfterRound: (...args) => clashBridgeManager?.rotateAfterRound?.(...args),
+  rotateClashProxyAfterRound,
   runAutoSequenceFromStep: (...args) => runAutoSequenceFromStep(...args),
   runtime: {
     get: () => ({
@@ -8395,6 +8549,8 @@ const messageRouter = self.MultiPageBackgroundMessageRouter?.createMessageRouter
   startAutoRunLoop,
   pollContributionStatus: (...args) => contributionOAuthManager?.pollContributionStatus?.(...args),
   requestExtensionUpdate: (...args) => runtimeUpdateManager?.requestImmediateUpdate?.(...args),
+  requestExtensionReload,
+  refreshProxyNodes,
   syncHotmailAccounts,
   deleteMail2925Account,
   deleteMail2925Accounts,
@@ -9549,6 +9705,9 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== AUTO_RUN_TIMER_ALARM_NAME) {
+    proxyNodeManager?.handleAlarm?.(alarm.name).catch((err) => {
+      console.error(LOG_PREFIX, 'Failed to handle proxy node alarm:', err);
+    });
     return;
   }
   launchAutoRunTimerPlan('alarm').catch((err) => {
