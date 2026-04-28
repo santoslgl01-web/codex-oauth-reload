@@ -1659,12 +1659,12 @@ function updateAutoDelayInputState() {
 }
 
 function updateClashBridgeInputState() {
-  const scheduled = isAutoRunScheduledPhase();
+  const locked = isAutoRunLockedPhase();
   const enabled = typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled
     ? Boolean(inputClashBridgeEnabled.checked)
     : false;
   if (typeof inputClashBridgeEnabled !== 'undefined' && inputClashBridgeEnabled) {
-    inputClashBridgeEnabled.disabled = scheduled;
+    inputClashBridgeEnabled.disabled = locked;
   }
   [
     typeof inputClashBridgeControllerUrl !== 'undefined' ? inputClashBridgeControllerUrl : null,
@@ -1672,7 +1672,7 @@ function updateClashBridgeInputState() {
     typeof inputClashBridgeSecret !== 'undefined' ? inputClashBridgeSecret : null,
   ].forEach((input) => {
     if (input) {
-      input.disabled = scheduled || !enabled;
+      input.disabled = locked;
     }
   });
   if (typeof rowClashBridgeProxyGroup !== 'undefined' && rowClashBridgeProxyGroup) {
@@ -2401,7 +2401,7 @@ function applyAutoRunStatus(payload = currentAutoRun) {
   const locked = isAutoRunLockedPhase();
   const paused = isAutoRunPausedPhase();
   const scheduled = isAutoRunScheduledPhase();
-  const settingsCardLocked = scheduled || locked;
+  const settingsCardLocked = locked;
 
   setSettingsCardLocked(settingsCardLocked);
 

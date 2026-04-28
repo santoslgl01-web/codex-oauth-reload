@@ -99,3 +99,12 @@ Ultra1.5 已发布到：
 ```
 
 后续 Ultra1.6、Ultra1.7 等版本必须继续使用这把 `.pem` 打包，否则扩展 ID 会变化，已经安装 Ultra1.5 CRX 的用户无法通过“一键更新”升级。
+
+## Ultra1.5.1 热修复资产记录
+
+Ultra1.5.1 修复了侧边栏 `Clash 桥接` 开关和控制器输入框在部分状态下不可点击 / 不可编辑的问题。
+
+- Release: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/tag/Ultra1.5.1`
+- CRX: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5.1/codex-oauth-reload-Ultra1.5.1.crx`
+- updates.xml: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5.1/updates.xml`
+- Extension ID: `gbjfndnlhnfnioenpkhfjakefkajclog`

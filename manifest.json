@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "codex-oauth-reload",
-  "version": "1.5",
-  "version_name": "Ultra1.5",
+  "version": "1.5.1",
+  "version_name": "Ultra1.5.1",
   "description": "用于自动执行多步骤 OAuth 注册流程",
   "update_url": "https://github.com/santoslgl01-web/codex-oauth-reload/releases/latest/download/updates.xml",
   "permissions": [
