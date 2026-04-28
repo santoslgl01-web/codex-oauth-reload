@@ -12,7 +12,7 @@
   const PROXY_BACKEND_BROWSER = 'browser';
   const PROXY_BACKEND_CLASH = 'clash';
   const DEFAULT_PROXY_BACKEND = PROXY_BACKEND_BROWSER;
-  const DEFAULT_CLASH_CONTROL_URL = 'http://127.0.0.1:9090';
+  const DEFAULT_CLASH_CONTROL_URL = 'http://127.0.0.1:62754';
   const DEFAULT_CLASH_PROXY_HOST = '127.0.0.1';
   const DEFAULT_CLASH_MIXED_PORT = 7890;
   const DEFAULT_CLASH_SELECTOR_GROUP = 'NODE-SELECT';
@@ -403,7 +403,7 @@
       const mixedPort = normalizeClashMixedPort(options.clashMixedPort ?? state.clashMixedPort);
       const selectorGroup = normalizeClashSelectorGroup(options.clashSelectorGroup ?? state.clashSelectorGroup);
       const delayTestUrl = normalizeClashDelayTestUrl(options.clashDelayTestUrl ?? state.clashDelayTestUrl);
-      let controllerHostPort = '127.0.0.1:9090';
+      let controllerHostPort = '127.0.0.1:62754';
       try {
         controllerHostPort = new URL(controllerUrl).host || controllerHostPort;
       } catch (_) {}
@@ -986,7 +986,7 @@
     function buildClashManagedConfigPayload(nodes = [], state = {}, clashConfig = {}) {
       const selectorGroup = normalizeClashSelectorGroup(clashConfig.selectorGroup);
       const delayUrl = normalizeClashDelayTestUrl(clashConfig.delayTestUrl || state.clashDelayTestUrl);
-      const controllerHostPort = String(clashConfig.controllerHostPort || '127.0.0.1:9090').trim();
+      const controllerHostPort = String(clashConfig.controllerHostPort || '127.0.0.1:62754').trim();
       const mixedPort = normalizeClashMixedPort(clashConfig.mixedPort);
       const domains = normalizeProxyRuleDomains(state.proxyRuleDomains);
       const proxyNameLines = nodes.map((node) => `      - ${stringifyYamlScalar(node.clashName || node.name)}`).join('\n');

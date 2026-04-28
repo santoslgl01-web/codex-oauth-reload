@@ -27,9 +27,9 @@ test('clash bridge rotates the configured selector group through local API', asy
   const logs = [];
   let state = {
     clashBridgeEnabled: true,
-    clashBridgeControllerUrl: '127.0.0.1:9090',
+    clashBridgeControllerUrl: '127.0.0.1:62754',
     clashBridgeSecret: 'secret',
-    clashBridgeProxyGroup: '节点选择',
+    clashBridgeProxyGroup: 'NODE-SELECT',
     clashBridgeExcludePattern: api.DEFAULT_EXCLUDE_PATTERN,
     clashBridgeSetRuleMode: true,
     clashBridgeLastProxyName: '',
@@ -57,13 +57,13 @@ test('clash bridge rotates the configured selector group through local API', asy
         assert.equal(options.headers.Authorization, 'Bearer secret');
         return { ok: true, status: 204, async json() { return null; } };
       }
-      if (url.endsWith('/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9') && options.method === 'GET') {
+      if (url.endsWith('/proxies/NODE-SELECT') && options.method === 'GET') {
         return {
           ok: true,
           status: 200,
           async json() {
             return {
-              name: '节点选择',
+              name: 'NODE-SELECT',
               type: 'Selector',
               now: 'US 01',
               all: ['DIRECT', 'US 01', 'JP 01'],
@@ -71,7 +71,7 @@ test('clash bridge rotates the configured selector group through local API', asy
           },
         };
       }
-      if (url.endsWith('/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9') && options.method === 'PUT') {
+      if (url.endsWith('/proxies/NODE-SELECT') && options.method === 'PUT') {
         assert.deepEqual(JSON.parse(options.body), { name: 'JP 01' });
         return { ok: true, status: 204, async json() { return null; } };
       }
@@ -94,9 +94,9 @@ test('clash bridge can rotate through synced proxy nodes from storage', async ()
   const calls = [];
   let state = {
     clashBridgeEnabled: true,
-    clashBridgeControllerUrl: 'http://127.0.0.1:9090',
+    clashBridgeControllerUrl: 'http://127.0.0.1:62754',
     clashBridgeSecret: '',
-    clashBridgeProxyGroup: '节点选择',
+    clashBridgeProxyGroup: 'NODE-SELECT',
     clashBridgeExcludePattern: api.DEFAULT_EXCLUDE_PATTERN,
     clashBridgeSetRuleMode: false,
     clashBridgeLastProxyName: 'US 01',
@@ -120,13 +120,13 @@ test('clash bridge can rotate through synced proxy nodes from storage', async ()
     AbortController,
     async fetch(url, options = {}) {
       calls.push({ url, options });
-      if (url.endsWith('/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9') && options.method === 'GET') {
+      if (url.endsWith('/proxies/NODE-SELECT') && options.method === 'GET') {
         return {
           ok: true,
           status: 200,
           async json() {
             return {
-              name: '节点选择',
+              name: 'NODE-SELECT',
               type: 'Selector',
               now: 'US 01',
               all: ['DIRECT', 'US 01', 'JP 01', 'HK 01'],
@@ -134,7 +134,7 @@ test('clash bridge can rotate through synced proxy nodes from storage', async ()
           },
         };
       }
-      if (url.endsWith('/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9') && options.method === 'PUT') {
+      if (url.endsWith('/proxies/NODE-SELECT') && options.method === 'PUT') {
         assert.deepEqual(JSON.parse(options.body), { name: 'JP 01' });
         return { ok: true, status: 204, async json() { return null; } };
       }

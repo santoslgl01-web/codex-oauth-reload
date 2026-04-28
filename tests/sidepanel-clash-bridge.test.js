@@ -55,6 +55,8 @@ test('sidepanel html exposes local Clash bridge controls', () => {
   assert.match(sidepanelHtml, /id="input-clash-bridge-controller-url"/);
   assert.match(sidepanelHtml, /id="input-clash-bridge-proxy-group"/);
   assert.match(sidepanelHtml, /id="input-clash-bridge-secret"/);
+  assert.match(sidepanelHtml, /placeholder="http:\/\/127\.0\.0\.1:62754"/);
+  assert.match(sidepanelHtml, /placeholder="NODE-SELECT"/);
 });
 
 test('sidepanel source persists Clash bridge settings', () => {
@@ -62,6 +64,8 @@ test('sidepanel source persists Clash bridge settings', () => {
   assert.match(sidepanelSource, /clashBridgeControllerUrl/);
   assert.match(sidepanelSource, /clashBridgeProxyGroup/);
   assert.match(sidepanelSource, /clashBridgeSecret/);
+  assert.match(sidepanelSource, /http:\/\/127\.0\.0\.1:62754/);
+  assert.match(sidepanelSource, /NODE-SELECT/);
 });
 
 test('Clash bridge settings remain editable before enabling the bridge', () => {

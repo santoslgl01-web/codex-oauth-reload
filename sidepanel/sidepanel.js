@@ -1549,24 +1549,24 @@ function normalizeAutoStepDelaySeconds(value) {
 }
 
 function normalizeClashBridgeControllerUrlValue(value = '') {
-  const raw = String(value || '').trim() || 'http://127.0.0.1:9090';
+  const raw = String(value || '').trim() || 'http://127.0.0.1:62754';
   const candidate = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(raw) ? raw : `http://${raw}`;
   try {
     const parsed = new URL(candidate);
     if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return 'http://127.0.0.1:9090';
+      return 'http://127.0.0.1:62754';
     }
     parsed.pathname = parsed.pathname.replace(/\/+$/, '');
     parsed.search = '';
     parsed.hash = '';
     return parsed.toString().replace(/\/+$/, '');
   } catch {
-    return 'http://127.0.0.1:9090';
+    return 'http://127.0.0.1:62754';
   }
 }
 
 function normalizeClashBridgeProxyGroupValue(value = '') {
-  return String(value || '').trim() || '节点选择';
+  return String(value || '').trim() || 'NODE-SELECT';
 }
 
 function normalizeProxyNodeSourceRepoValue(value = '') {
@@ -2151,10 +2151,10 @@ function collectSettingsPayload() {
     };
   const normalizeClashController = typeof normalizeClashBridgeControllerUrlValue === 'function'
     ? normalizeClashBridgeControllerUrlValue
-    : ((value = '') => String(value || '').trim() || 'http://127.0.0.1:9090');
+    : ((value = '') => String(value || '').trim() || 'http://127.0.0.1:62754');
   const normalizeClashGroup = typeof normalizeClashBridgeProxyGroupValue === 'function'
     ? normalizeClashBridgeProxyGroupValue
-    : ((value = '') => String(value || '').trim() || '节点选择');
+    : ((value = '') => String(value || '').trim() || 'NODE-SELECT');
   const normalizeProxyRepo = typeof normalizeProxyNodeSourceRepoValue === 'function'
     ? normalizeProxyNodeSourceRepoValue
     : ((value = '') => String(value || '').trim() || 'free-nodes/clashfree');

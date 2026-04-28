@@ -1,8 +1,8 @@
 (function attachBackgroundClashBridge(root, factory) {
   root.MultiPageBackgroundClashBridge = factory();
 })(typeof self !== 'undefined' ? self : globalThis, function createBackgroundClashBridgeModule() {
-  const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:9090';
-  const DEFAULT_PROXY_GROUP = '节点选择';
+  const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:62754';
+  const DEFAULT_PROXY_GROUP = 'NODE-SELECT';
   const DEFAULT_EXCLUDE_PATTERN = '香港|hong[ -]?kong|\\bhk\\b|\\bhkg\\b|🇭🇰|DIRECT|REJECT|GLOBAL|自动|故障|负载|轮询|剩余流量|套餐|到期|traffic|expire|subscription|reset';
   const FETCH_TIMEOUT_MS = 8000;
 

@@ -124,3 +124,17 @@ Ultra1.5.2 增加了代理节点同步与侧边栏一键重启：
 - CRX: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5.2/codex-oauth-reload-Ultra1.5.2.crx`
 - updates.xml: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5.2/updates.xml`
 - Extension ID: `gbjfndnlhnfnioenpkhfjakefkajclog`
+
+## Ultra1.5.3 发布资产记录
+
+Ultra1.5.3 将 Clash 桥接默认值调整为当前本地 Clash 控制器配置：
+
+- 默认控制器：`http://127.0.0.1:62754`
+- 默认分组：`NODE-SELECT`
+
+发布后资产应为：
+
+- Release: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/tag/Ultra1.5.3`
+- CRX: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5.3/codex-oauth-reload-Ultra1.5.3.crx`
+- updates.xml: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5.3/updates.xml`
+- Extension ID: `gbjfndnlhnfnioenpkhfjakefkajclog`
