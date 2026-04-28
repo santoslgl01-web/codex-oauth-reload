@@ -82,3 +82,20 @@ dist/updates.xml
 3. 用 `scripts/generate-update-manifest.js` 生成 `updates.xml`。
 4. 创建 GitHub Release，并上传 `.crx` 与 `updates.xml`。
 5. 已安装 CRX 的用户在侧边栏看到更新后点击“一键更新”。
+
+## Ultra1.5 发布资产记录
+
+Ultra1.5 已发布到：
+
+- Release: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/tag/Ultra1.5`
+- CRX: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5/codex-oauth-reload-Ultra1.5.crx`
+- updates.xml: `https://github.com/santoslgl01-web/codex-oauth-reload/releases/download/Ultra1.5/updates.xml`
+- Extension ID: `gbjfndnlhnfnioenpkhfjakefkajclog`
+
+本机首次生成的 CRX 签名私钥保存为：
+
+```text
+/Users/lgl/Downloads/codex-oauth-reload-release-key.pem
+```
+
+后续 Ultra1.6、Ultra1.7 等版本必须继续使用这把 `.pem` 打包，否则扩展 ID 会变化，已经安装 Ultra1.5 CRX 的用户无法通过“一键更新”升级。

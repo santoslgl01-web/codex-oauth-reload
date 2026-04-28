@@ -9,3 +9,6 @@
 .npm-test.log
 .omx/
 /node_modules
+/dist/
+*.crx
+*.pem
